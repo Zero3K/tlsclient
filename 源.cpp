@@ -5,41 +5,11 @@
 #include <WinSock2.h>
 #pragma comment(lib, "ws2_32.lib")
 
-
-	class CLockData
-	{
-	public:
-		CRITICAL_SECTION m_Criti;
-		CLockData()
-		{
-			InitializeCriticalSection(&m_Criti);
-		}
-		~CLockData()
-		{
-			DeleteCriticalSection(&m_Criti);
-		}
-	};
-
-	class CLock
-	{
-		CLockData *m_pData;
-	public:
-		CLock(CLockData &pData)
-		{
-			m_pData = &pData;
-			EnterCriticalSection(&m_pData->m_Criti);
-		}
-		~CLock()
-		{
-			LeaveCriticalSection(&m_pData->m_Criti);
-		}
-	};
-
-
 #include <crtdbg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include "tlsclient.cpp"
+#include "lock.h"
 
 #define TEST_ENCODER
 #ifdef TEST_ENCODER

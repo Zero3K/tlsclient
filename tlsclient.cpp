@@ -6,7 +6,7 @@
 #include "ecc.c"
 #include "gcm.c"
 #include "sha2.c"
-
+#include "lock.h"
 
 
 
