@@ -1,11 +1,15 @@
-#pragma once
+ï»¿#pragma once
 
+#include <WinSock2.h>
+#include <windows.h>
 #include <stdint.h>
+#include <fstream>
 #include "chacha20.c"
 #include "tls.h"
 #include "ecc.c"
 #include "gcm.c"
 #include "sha2.c"
+#include "lock.h"
 
 
 
@@ -212,10 +216,10 @@ public:
 		int ret3 = gcm_finish(&aes_gcm_remote, (unsigned char*)tag, tag_length);
 
         if ((ret1) || (ret2) || (ret3)) 
-			return "´íÎóµÄ°ü";
+			return "Â´Ã­ÃÃ³ÂµÃ„Â°Ã¼";
         // check tag
         if (memcmp(in.buf + (tls_13 ? 0 : encryption_length) + decode_length, tag, tag_length) )
-			return "Êı¾İĞ£ÑéÊ§°Ü";
+			return "ÃŠÃ½Â¾ÃÃÂ£Ã‘Ã©ÃŠÂ§Â°Ãœ";
 		return 0;
 	}
 	virtual int compute_size(int size, int encode_or_decode, bool tls_13)
@@ -286,7 +290,7 @@ public:
 		chacha20_poly1305_key(&chacha_remote, poly1305_key);
 		int size = chacha20_poly1305_decode(&chacha_remote, (u8*)in.buf, in.buf_size, (u8*)aad, aad_size, poly1305_key, (u8*)out.buf);
 		if(size <= 0)
-			return "Êı¾İĞ£ÑéÊ§°Ü";
+			return "ÃŠÃ½Â¾ÃÃÂ£Ã‘Ã©ÃŠÂ§Â°Ãœ";
 		out.size = size;
 		return 0;
 	}
@@ -594,7 +598,7 @@ public:
 			if(chiper_list()[i].cipher == cipher)
 				cipher_index = i;
 		if(cipher_index == -1)
-			return "Ã»ÓĞ¶ÔÓ¦µÄ½âÂëÌ×¼ş";
+			return "ÃƒÂ»Ã“ÃÂ¶Ã”Ã“Â¦ÂµÃ„Â½Ã¢Ã‚Ã«ÃŒÃ—Â¼Ã¾";
 		encoder = chiper_list()[cipher_index].encoder_create();
 		if(tls_13 == false)
 			memcpy(data12.server_rand, rand, RAND_SIZE);
@@ -626,7 +630,7 @@ public:
 		{
 			pri_ecc_key[ecc_index] = new EccState;
 			if(ecc_init(pri_ecc_key[ecc_index], ecc_list()[ecc_index].size) != 0)
-				return "³õÊ¼»¯ecc keyÊ§°Ü";
+				return "Â³ÃµÃŠÂ¼Â»Â¯ecc keyÃŠÂ§Â°Ãœ";
 		}
 
 		int size = MAX_PUBKEY_SIZE;
@@ -648,7 +652,7 @@ private:
 				cur_ecc = &ecc_list()[ecc_index];
 		ecc_index--;
 		if(ecc_index >= ecc_count || cur_ecc == 0)
-			return "Ã»ÕÒµ½¶ÔÓ¦µÄecc ²ÎÊı";
+			return "ÃƒÂ»Ã•Ã’ÂµÂ½Â¶Ã”Ã“Â¦ÂµÃ„ecc Â²ÃÃŠÃ½";
 		const char *ret = 0;
 		if(ret = compute_pubkey(ecc_index, pub_key))
 			return ret;
@@ -656,7 +660,7 @@ private:
 		premaster_key.set_size(ecc_list()[ecc_index].size);
 
 		if(ecdh_shared_secret(pri_ecc_key[ecc_index], (u8*)_server_key, server_key_len, (u8*)premaster_key.buf) != 0)
-			return "ecc¼ÆËãpre master keyÊ§°Ü";
+			return "eccÂ¼Ã†Ã‹Ã£pre master keyÃŠÂ§Â°Ãœ";
 
 		return 0;
 	}
@@ -664,7 +668,7 @@ public:
 	const char *tls12_compute_key(ECC_GROUP ecc, const char *_server_key, int server_key_len)
 	{
 		if(cipher_index == -1)
-			return "compute_key error:Ã»ÓĞ¶ÔÓ¦µÄ½âÂëÌ×¼ş";
+			return "compute_key error:ÃƒÂ»Ã“ÃÂ¶Ã”Ã“Â¦ÂµÃ„Â½Ã¢Ã‚Ã«ÃŒÃ—Â¼Ã¾";
 	//	CLock lock(lockdata);
 
 		tlsbuf premaster_key;
@@ -673,22 +677,22 @@ public:
 			return ret;
 		
 		int key_len = chiper_list()[cipher_index].key_len;
-		//----Ö÷ÃÜÔ¿¼ÆËã
+		//----Ã–Ã·ÃƒÃœÃ”Â¿Â¼Ã†Ã‹Ã£
 		char master_secret_label[] = "master secret", key_expansion[] = "key expansion";
 		_private_tls_prf((char*)data12.master_key, sizeof(data12.master_key), premaster_key.buf, premaster_key.size, master_secret_label, strlen(master_secret_label), (char*)data12.client_rand, RAND_SIZE, data12.server_rand, RAND_SIZE);
 	
-		unsigned char key[192];	//Ò»¸ö±È½Ï´óµÄÊı×é
+		unsigned char key[192];	//Ã’Â»Â¸Ã¶Â±ÃˆÂ½ÃÂ´Ã³ÂµÃ„ÃŠÃ½Ã—Ã©
 		_private_tls_prf((char*)key, sizeof(key), (char*)data12.master_key, sizeof(data12.master_key), key_expansion, strlen(key_expansion), (char*)data12.server_rand, RAND_SIZE, data12.client_rand, RAND_SIZE);
 		
 		if(encoder->init(key, key+key_len, key+key_len*2, key+key_len*2 + encoder->iv_len(false), key_len, false) == false)
-			return "³õÊ¼»¯cipherÊ§°Ü";
+			return "Â³ÃµÃŠÂ¼Â»Â¯cipherÃŠÂ§Â°Ãœ";
 		return 0;
 	}
 
 	const char *tls13_compute_key(ECC_GROUP ecc, const char *_server_key, int server_key_len, const char *finished_hash)
 	{
 		if(cipher_index == -1)
-			return "compute_key error:Ã»ÓĞ¶ÔÓ¦µÄ½âÂëÌ×¼ş";
+			return "compute_key error:ÃƒÂ»Ã“ÃÂ¶Ã”Ã“Â¦ÂµÃ„Â½Ã¢Ã‚Ã«ÃŒÃ—Â¼Ã¾";
 	//	CLock lock(lockdata);
 		
 		int key_len		= chiper_list()[cipher_index].key_len;
@@ -740,7 +744,7 @@ public:
 
 		
 		if(encoder->init(local_keybuffer, remote_keybuffer, local_ivbuffer, remote_ivbuffer, key_len, true) == false)
-			return "³õÊ¼»¯cipherÊ§°Ü";
+			return "Â³ÃµÃŠÂ¼Â»Â¯cipherÃŠÂ§Â°Ãœ";
 
 		return 0;
 	}
@@ -840,7 +844,7 @@ public:
 
 	bool verify_serverkey_exchange(int hash_type, const char *sign, int sign_size, const char *message, int msg_size)
 	{
-		return true;	//ĞèÒªÖ¤ÊéÑéÖ¤, SHA256(client_hello_random + server_hello_random + curve_info + public_key)
+		return true;	//ÃÃ¨Ã’ÂªÃ–Â¤ÃŠÃ©Ã‘Ã©Ã–Â¤, SHA256(client_hello_random + server_hello_random + curve_info + public_key)
 		if(encoder == 0)
 			return false;
 		//tlsbuf msg;
@@ -902,7 +906,7 @@ class tls_client
 	}
 	int get_states_count(bool tls_13)
 	{
-		return tls_13 ? 6 : 4;	//tls12ÔÚhello doneÖ±½ÓÔÊĞí·¢ËÍÏûÏ¢
+		return tls_13 ? 6 : 4;	//tls12Ã”Ãšhello doneÃ–Â±Â½Ã“Ã”ÃŠÃÃ­Â·Â¢Ã‹ÃÃÃ»ÃÂ¢
 	}
 	int get_states_count()
 	{
@@ -918,6 +922,7 @@ class tls_client
 	tlsbuf				err_msg;
 	int					recv_channel_readed	= 0;
 	int					time_out			= 0x7fffffff;
+	bool				received_close_notify = false;
 
 	bool is_tls13(TLS_CIPHER cipher)
 	{
@@ -940,105 +945,126 @@ class tls_client
 			tmp_buf.buf[0] = CONTENT_APPLICATION_DATA;
 		}
 
-		crypto.encode(tmp_buf, buf.buf, buf.size, keep_original, is_tls13(crypto.get_chiper_type()));		//-----------¼ÓÃÜ´úÂë
+		crypto.encode(tmp_buf, buf.buf, buf.size, keep_original, is_tls13(crypto.get_chiper_type()));		//-----------Â¼Ã“ÃƒÃœÂ´ÃºÃ‚Ã«
 
 		*(u_short*)(tmp_buf.buf+body_size_index) = htons(tmp_buf.size - body_size_index - 2);
+		std::ofstream tls_record_log("tls_record.log", std::ios::app | std::ios::binary);
+		tls_record_log.write(tmp_buf.buf, tmp_buf.size);
+		tls_record_log.close();
 		if( ::send(s, tmp_buf.buf, tmp_buf.size, 0) != tmp_buf.size)
-			return "·¢ËÍÊı¾İÊ§°Ü";
+			return "Â·Â¢Ã‹ÃÃŠÃ½Â¾ÃÃŠÂ§Â°Ãœ";
 
-		DumpData("·¢ËÍÊı¾İ:", tmp_buf.buf, tmp_buf.size);
+		DumpData("Â·Â¢Ã‹ÃÃŠÃ½Â¾Ã:", tmp_buf.buf, tmp_buf.size);
 		return 0;
 	}
 	
-	const char *send_client_hello(SOCKET s, const char *host, tls_version version)
+	const char* send_client_hello(SOCKET s, const char* host, tls_version version)
 	{
 		send_buf.clear();
 
-		bool								hastls13		= false;
+		bool hastls13 = false;
 
 		send_buf.append((char)MSG_CLIENT_HELLO);
-		int handshake_size_index = send_buf.append_size(3);		//tls handshake body size
+		int handshake_size_index = send_buf.append_size(3); // tls handshake body size
 
 		send_buf.append((short)0x303);
 		send_buf.append(crypto.create_client_rand(), RAND_SIZE);
-		send_buf.append((char)0);	//»á»°id£¬³¤¶ÈÎª0²»Ìá¹©
-	
-		int ciper_count_index	= send_buf.append_size(2);
-		for(int i = 0; i < crypto.chiper_count; i++)
+		send_buf.append((char)0); // session id, usually 0
+
+		int ciper_count_index = send_buf.append_size(2);
+		for (int i = 0; i < crypto.chiper_count; i++)
 		{
-			if(is_tls13(crypto.chiper_list()[i].cipher) && version != tls13)
+			if (is_tls13(crypto.chiper_list()[i].cipher) && version != tls13)
 				continue;
 			send_buf.append(htons(crypto.chiper_list()[i].cipher));
 			hastls13 |= is_tls13(crypto.chiper_list()[i].cipher);
 		}
-		*(unsigned short*)(send_buf.buf+ciper_count_index) = htons(send_buf.size - ciper_count_index-2);
+		*(unsigned short*)(send_buf.buf + ciper_count_index) = htons(send_buf.size - ciper_count_index - 2);
 
-		send_buf.append((char)1);	//²»Ñ¹Ëõ
-		send_buf.append((char)0);
+		send_buf.append((char)1); // compression methods count
+		send_buf.append((char)0); // no compression
 
 		int ext_size_index = send_buf.append_size(2);
-		send_buf.append(htons(EXT_SERVER_NAME));	//ext type ·şÎñÆ÷Ãû
-		int host_len = strlen(host);
-		send_buf.append(htons(host_len+5));	//host×Ü³¤¶È
-		send_buf.append(htons(host_len+3));	//µÚÒ»¸öÃèÊö³¤¶È
-		send_buf.append((char)0);	//µÚ0¸öhostÒ²ÊÇÎ¨Ò»Ò»¸ö
-		send_buf.append(htons(host_len));
-		send_buf.append(host, host_len);
-	
 
-		send_buf.append(htons(EXT_SUPPORTED_GROUPS));	//ext type ÍÖÔ²ÇúÏß
-		send_buf.append(htons(crypto.ecc_count*2+2));	//ext size	
-		send_buf.append(htons(crypto.ecc_count*2));	//Ö§³Ö2¸öÍÖÔ²ÇúÏß
-		for(int i = 0; i < crypto.ecc_count; i++)
+		// --- SNI Extension ---
+		send_buf.append(htons(EXT_SERVER_NAME)); // extension type
+		int host_len = strlen(host);
+		send_buf.append(htons(host_len + 5));    // Extension length
+		send_buf.append(htons(host_len + 3));    // ServerNameList length
+		send_buf.append((char)0);                // NameType: host_name
+		send_buf.append(htons(host_len));        // Host length
+		send_buf.append(host, host_len);         // Host
+
+		// --- ALPN Extension (RFC 7301) ---
+		// Extension type: 0x0010
+		// Extension length: 2 + 1 + strlen("http/1.1") = 11
+		// ProtocolNameList length: 1 + strlen("http/1.1") = 9 (2 bytes)
+		// ProtocolName length: 8 (1 byte)
+		// ProtocolName: "http/1.1"
+		const char* alpn_proto = "http/1.1";
+		unsigned char alpn_proto_len = (unsigned char)strlen(alpn_proto);
+
+		send_buf.append(htons(0x0010)); // ALPN extension type
+		send_buf.append(htons(2 + 1 + alpn_proto_len)); // Extension length
+		send_buf.append(htons(1 + alpn_proto_len)); // ProtocolNameList length (2 bytes)
+		send_buf.append((unsigned char)alpn_proto_len); // ProtocolName length (1 byte)
+		send_buf.append(alpn_proto, alpn_proto_len);    // ProtocolName
+
+		// --- Supported Groups Extension ---
+		send_buf.append(htons(EXT_SUPPORTED_GROUPS)); // extension type
+		send_buf.append(htons(crypto.ecc_count * 2 + 2)); // ext size
+		send_buf.append(htons(crypto.ecc_count * 2)); // list length
+		for (int i = 0; i < crypto.ecc_count; i++)
 			send_buf.append(htons(crypto.ecc_list()[i].iana));
 
-		if(hastls13)
+		// --- TLS 1.3 Extensions ---
+		if (hastls13)
 		{
 			send_buf.append(htons(EXT_SUPPORTED_VERSION));
 			send_buf.append(htons(3));
 			send_buf.append((char)2);
 			send_buf.append(htons(version));
 
-			send_buf.append(htons(EXT_SIGNATURE_ALGORITHMS));	//
-			send_buf.append(htons(24));	//
-			send_buf.append(htons(22));	//
-			send_buf.append(htons(0x0403));	//
-			send_buf.append(htons(0x0503));	//
-			send_buf.append(htons(0x0603));	//
-			send_buf.append(htons(0x0804));	//
-			send_buf.append(htons(0x0805));	//
-			send_buf.append(htons(0x0806));	//
-			send_buf.append(htons(0x0401));	//
-			send_buf.append(htons(0x0501));	//
-			send_buf.append(htons(0x0601));	//
-			send_buf.append(htons(0x0203));	//
-			send_buf.append(htons(0x0201));	//
+			send_buf.append(htons(EXT_SIGNATURE_ALGORITHMS)); //
+			send_buf.append(htons(24)); //
+			send_buf.append(htons(22)); //
+			send_buf.append(htons(0x0403)); //
+			send_buf.append(htons(0x0503)); //
+			send_buf.append(htons(0x0603)); //
+			send_buf.append(htons(0x0804)); //
+			send_buf.append(htons(0x0805)); //
+			send_buf.append(htons(0x0806)); //
+			send_buf.append(htons(0x0401)); //
+			send_buf.append(htons(0x0501)); //
+			send_buf.append(htons(0x0601)); //
+			send_buf.append(htons(0x0203)); //
+			send_buf.append(htons(0x0201)); //
 
-
-			send_buf.append(htons(EXT_KEY_SHARE));	//ext type ÍÖÔ²ÇúÏß
+			send_buf.append(htons(EXT_KEY_SHARE)); // extension type
 			int share_size = send_buf.append_size(2);
 			send_buf.append_size(2);
-			for(int i = 0; i < crypto.ecc_count; i++)
+			for (int i = 0; i < crypto.ecc_count; i++)
 			{
-				auto &ecc = crypto.ecc_list()[i];
+				auto& ecc = crypto.ecc_list()[i];
 				send_buf.append(htons(ecc.iana));
 				int share_size_sub = send_buf.append_size(2);
-				const char *ret = crypto.compute_pubkey(i, send_buf);
-				if(ret)
+				const char* ret = crypto.compute_pubkey(i, send_buf);
+				if (ret)
 					return ret;
-				*(u_short*)(send_buf.buf+share_size_sub) = htons(send_buf.size - share_size_sub - 2);
+				*(u_short*)(send_buf.buf + share_size_sub) = htons(send_buf.size - share_size_sub - 2);
 			}
-			*(u_short*)(send_buf.buf+share_size) = htons(send_buf.size - share_size - 2);
-			*(u_short*)(send_buf.buf+share_size+2) = htons(send_buf.size - share_size - 4);
+			*(u_short*)(send_buf.buf + share_size) = htons(send_buf.size - share_size - 2);
+			*(u_short*)(send_buf.buf + share_size + 2) = htons(send_buf.size - share_size - 4);
 		}
-	
 
-		*(u_short*)(send_buf.buf+ext_size_index) = htons(send_buf.size - ext_size_index - 2);
+		*(u_short*)(send_buf.buf + ext_size_index) = htons(send_buf.size - ext_size_index - 2);
 		send_buf.buf[handshake_size_index] = 0;
-		*(u_short*)(send_buf.buf + handshake_size_index+1) = htons(send_buf.size - handshake_size_index - 3);
+		*(u_short*)(send_buf.buf + handshake_size_index + 1) = htons(send_buf.size - handshake_size_index - 3);
 
 		return send_packet(CONTENT_HANDSHAKE, 0x303, send_buf);
 	}
+
+
 
 	const char *send_client_finish(SOCKET s)
 	{
@@ -1084,8 +1110,8 @@ class tls_client
 		reader.read(server_rand, sizeof(server_rand));
 		int session_len = reader.read<char>();
 		reader.readed += session_len;
-		TLS_CIPHER	cur_cipher	= (TLS_CIPHER)ntohs(reader.read<short>());	//Ñ¡ÔñµÄÃÜÂëÌ×¼ş
-		int			compress	= reader.read<char>();		//Ñ¹Ëõ·½Ê½
+		TLS_CIPHER	cur_cipher	= (TLS_CIPHER)ntohs(reader.read<short>());	//Ã‘Â¡Ã”Ã±ÂµÃ„ÃƒÃœÃ‚Ã«ÃŒÃ—Â¼Ã¾
+		int			compress	= reader.read<char>();		//Ã‘Â¹Ã‹ÃµÂ·Â½ÃŠÂ½
 
 		const char *ret = crypto.update_server_info(cur_cipher, server_rand, is_tls13(cur_cipher));
 		if(ret)
@@ -1121,7 +1147,7 @@ class tls_client
 		if(tls_ver != 0)
 		{
 			if(tls_ver != 0x0304 || pubkey.size <= 0 || eccgroup == ECC_NONE)
-				return "·µ»ØµÄÍÖÔ²²ÎÊı²»ÕıÈ·";
+				return "Â·ÂµÂ»Ã˜ÂµÃ„ÃÃ–Ã”Â²Â²ÃÃŠÃ½Â²Â»Ã•Ã½ÃˆÂ·";
 			const char *ret;
 			if(ret = crypto.tls13_compute_key(eccgroup, pubkey.buf, pubkey.size, 0))
 				return ret;
@@ -1155,7 +1181,7 @@ class tls_client
 		int server_keyexchange_size = ntohl(reader.read<char>()<<8 | reader.read<short>()<<16);
 
 		if(reader.read<char>() != 3)
-			return "²»Ö§³ÖµÄÍÖÔ²Ä£Ê½";
+			return "Â²Â»Ã–Â§Â³Ã–ÂµÃ„ÃÃ–Ã”Â²Ã„Â£ÃŠÂ½";
 		ECC_GROUP eccgroup = (ECC_GROUP)ntohs(reader.read<short>());
 
 		tlsbuf server_key, sign;
@@ -1173,7 +1199,7 @@ class tls_client
 		sign.append_size(sign_size);
 		reader.read(sign.buf, sign.size);
 		if(crypto.verify_serverkey_exchange(hash_type, sign.buf, sign.size, reader.buf+4, msg_size) == false)
-			return "serverkeyexchange Ç©ÃûÑéÖ¤Ê§°Ü";
+			return "serverkeyexchange Ã‡Â©ÃƒÃ»Ã‘Ã©Ã–Â¤ÃŠÂ§Â°Ãœ";
 
 		return 0;
 	}
@@ -1200,7 +1226,7 @@ class tls_client
 		crypto.compute_verify(verify, 1, server_finished_size, is_tls13(crypto.get_chiper_type()), 1);
 
         if (memcmp(verify.buf, reader.buf+reader.readed, server_finished_size)) 
-			return "on_server_finished Êı¾İÑéÖ¤Ê§°Ü";
+			return "on_server_finished ÃŠÃ½Â¾ÃÃ‘Ã©Ã–Â¤ÃŠÂ§Â°Ãœ";
 		return 0;
 	}
 
@@ -1223,8 +1249,6 @@ class tls_client
 		return 0;
 	}
 	
-	
-
 	const char *on_packet(int packet_type, int version, tlsbuf_reader &reader)
 	{
 		const char *ret = 0;
@@ -1249,11 +1273,11 @@ class tls_client
 			if(state_index < get_states_count(tls_13) && packet_type != CONTENT_ALERT)
 			{
 				if(state_seq[state_index].content_type != packet_type || state_seq[state_index].handshake_type != reader_sig.buf[0])
-					return "´íÎóµÄ×´Ì¬";
+					return "Â´Ã­ÃÃ³ÂµÃ„Ã—Â´ÃŒÂ¬";
 				state_index++;
 			}
 
-			DumpData("½ÓÊÕÊı¾İ:", reader_sig.buf, reader_sig.buf_size);
+			DumpData("Â½Ã“ÃŠÃ•ÃŠÃ½Â¾Ã:", reader_sig.buf, reader_sig.buf_size);
 			if(packet_type == CONTENT_HANDSHAKE && reader_sig.buf_size > 0 && reader_sig.buf[0] != MSG_FINISHED)
 				crypto.update_hash(reader_sig.buf, reader_sig.buf_size);
 			if(packet_type == CONTENT_HANDSHAKE)
@@ -1296,13 +1320,27 @@ class tls_client
 				{
 					int level = reader_sig.read<unsigned char>();
 					int code = reader_sig.read<unsigned char>();
-					err_msg.set_size(256);
-					sprintf(err_msg.buf, "tls alert,level:0x%x code:0x%x", level, code);
-					return err_msg.buf;
+
+					if (code == 0) { // close_notify
+						received_close_notify = true;
+						printf("TLS: Received close_notify\n");
+					}
+					else if (level == 2) { // fatal alert
+						err_msg.set_size(256);
+						sprintf(err_msg.buf, "tls fatal alert: level=0x%x code=0x%x", level, code);
+						return err_msg.buf;
+					}
+					else {
+						printf("TLS warning alert: level=0x%x code=0x%x\n", level, code);
+					}
 				}
 			}
-			else if(packet_type == CONTENT_APPLICATION_DATA)
+			else if (packet_type == CONTENT_APPLICATION_DATA) {
+				printf("TLS: before append, recv channel size: %d\n",  recv_channel.size);
 				recv_channel.append(reader.buf, reader.buf_size);
+				printf("TLS: after append, recv channel size: %d\n",  recv_channel.size);
+			}
+				
 			reader.readed += seg_size;
 		}
 		return 0;
@@ -1317,7 +1355,7 @@ class tls_client
 			recv_buf.check_size(recv_buf.size+4096*4);
 			int len = ::recv(s, recv_buf.buf+recv_buf.size, 4096*4, 0);
 			if(len <= 0)
-				throw "Á¬½Ó¶Ï¿ª";
+				throw "ÃÂ¬Â½Ã“Â¶ÃÂ¿Âª";
 			recv_buf.size += len;
 
 			int cur_index = 0;
@@ -1385,6 +1423,11 @@ public:
 		close();
 	}
 
+	void shutdown_send() {
+		if (s != INVALID_SOCKET)
+			shutdown(s, SD_SEND);
+	}
+
 	static void init_global()
 	{
 		static CLockData lockdata;
@@ -1398,6 +1441,7 @@ public:
 
 	void close()
 	{
+		received_close_notify = false;
 		state_index	= 0;
 		recv_buf.clear();
 		recv_channel.clear();
@@ -1422,18 +1466,18 @@ public:
 	{
 		close();
 		if(host == 0 || host[0] == 0)
-			return set_err("host²ÎÊıÎŞĞ§", -1);
+			return set_err("hostÂ²ÃÃŠÃ½ÃÃÃÂ§", -1);
 		
 		if(ip == 0)
 		{
 			hostent *h = gethostbyname(host);
 			if(!h || h->h_length <= 0)
-				return set_err("hostÃ»ÓĞ¶ÔÓ¦µÄip", -1);
+				return set_err("hostÃƒÂ»Ã“ÃÂ¶Ã”Ã“Â¦ÂµÃ„ip", -1);
 			ip = *(DWORD*)h->h_addr_list[0];
 		}
 		s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 		if(s == INVALID_SOCKET)
-			return set_err("´´½¨socketÊ§°Ü", -1);
+			return set_err("Â´Â´Â½Â¨socketÃŠÂ§Â°Ãœ", -1);
 		SOCKADDR_IN addr;
 		memset(&addr, 0, sizeof(addr));
 		addr.sin_port	=	htons(port);
@@ -1444,7 +1488,7 @@ public:
 		try
 		{
 			if(connect(s, (sockaddr*)&addr, sizeof(addr)) != 0)
-				throw "Á´½Ó·şÎñÆ÷Ê§°Ü";
+				throw "ÃÂ´Â½Ã“Â·Ã¾ÃÃ±Ã†Ã·ÃŠÂ§Â°Ãœ";
 			if((ret = send_client_hello(s, host, version)))
 				throw ret;
 
@@ -1473,6 +1517,10 @@ public:
 			int send_size = min(size-i, 60000);
 			send_buf.set_size(size);
 			memcpy(send_buf.buf, buf+i, send_size);
+			// After: memcpy(send_buf.buf, buf+i, send_size);
+			std::ofstream plaintext_log("tls_plaintext.log", std::ios::app | std::ios::binary);
+			plaintext_log.write(send_buf.buf, send_buf.size);
+			plaintext_log.close();
 			const char *ret = send_packet(CONTENT_APPLICATION_DATA, 0x303, send_buf);
 			if(ret)
 				return set_err(ret, 0);
@@ -1485,14 +1533,23 @@ public:
 
 	int recv(char *out, int size)
 	{
+		if (received_close_notify && recv_channel.size <= recv_channel_readed) {
+			close();
+			return 0;
+		}
+
 		DWORD dw = GetTickCount();
 		if(state_index < get_states_count())
-			return set_err("socket Î´³õÊ¼»¯", 0);
+			return set_err("socket ÃÂ´Â³ÃµÃŠÂ¼Â»Â¯", 0);
 		while(1)
 		{
+			if (received_close_notify) {
+				break;
+			}
+
 			int signal = socket_signal(recv_channel.size <= recv_channel_readed ? 1 : 0);
 			if(signal == -1)
-				return set_err("socket select´íÎó", 0);
+				return set_err("socket selectÂ´Ã­ÃÃ³", 0);
 			if(!signal && recv_channel.size > recv_channel_readed)
 				break;
 
